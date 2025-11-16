@@ -1,6 +1,6 @@
 import allure
 import requests
-from data import Url
+from urls import Url
 
 
 class OrderMethods:
