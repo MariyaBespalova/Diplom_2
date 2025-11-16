@@ -1,9 +1,10 @@
 import allure
 import pytest
-
 from data import DataResponse
 from helpers import DataCreatedUser
 from user_methods import UserMethods
+from data import Data
+import json
 
 
 class TestCreatingUser:
@@ -12,12 +13,22 @@ class TestCreatingUser:
     def test_creating_unique_user(self, delete_user, request):
         user_body = DataCreatedUser.generate_body()
         response = UserMethods.created_user(user_body)
+        print("Полный ответ:", json.dumps(response.json(), indent=4))  # Вывод полного ответа для анализа
+    
         token = response.json()["accessToken"]
-        request.node.funcargs["delete_user"] = token
+        if token:
+            request.node.funcargs["delete_user"] = token
+        else:
+            raise AssertionError("Нет доступного токена.")
+        
         actual_body = response.json()
 
         assert response.status_code == 200
         assert actual_body["success"] is True
+        assert isinstance(actual_body["user"], dict) and len(actual_body.get("user").keys()) > 0  # Проверка уникального id
+        assert isinstance(token, str) and len(token) > 0  # Проверка наличия действительного токена
+        
+
 
     @allure.title('Создание уже зарегистрированного пользователя')
     def test_creating_registered_user(self, creating_user):
@@ -29,13 +40,17 @@ class TestCreatingUser:
         assert response.status_code == 403
         assert actual_body == expected_body
 
-    @pytest.mark.parametrize('email, password, name', [['', 555555, 'serega'],['qatest-11@yandex.ru', '', 'serega'],
-                                                      ['qatest-11@yandex.ru', 555555, '']])
+    @pytest.mark.parametrize('email, password, name', Data.USER_CREATION_DATA)
     @allure.title('Создание пользователя без заполненного поля')
     def test_creating_user_without_filled_field(self, email, password, name):
         user_body = {"email": email, "password": password, "name": name}
         response = UserMethods.created_user(user_body)
         expected_body = DataResponse.CREATING_USER_WITHOUT_FILLED_FIELD
+        actual_body = response.json()
+
+        assert response.status_code == 403
+        assert actual_body == expected_body
+
         actual_body = response.json()
 
         assert response.status_code == 403
